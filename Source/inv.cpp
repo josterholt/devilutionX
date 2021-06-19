@@ -795,17 +795,13 @@ int SwapItem(ItemStruct *a, ItemStruct *b)
 	return b->_iCurs + CURSOR_FIRSTITEM;
 }
 
-void CheckInvPaste(int pnum, Point cursorPosition)
+int GetSlotIndexByCursorCoords(int i, int j)
 {
-	auto &player = plr[pnum];
-
-	SetICursor(player.HoldItem._iCurs + CURSOR_FIRSTITEM);
-	int i = cursorPosition.x + (icursW / 2);
-	int j = cursorPosition.y + (icursH / 2);
 	int sx = icursW28;
 	int sy = icursH28;
 	bool done = false;
 	int r = 0;
+
 	for (; r < NUM_XY_SLOTS && !done; r++) {
 		int xo = RIGHT_PANEL;
 		int yo = 0;
@@ -829,25 +825,55 @@ void CheckInvPaste(int pnum, Point cursorPosition)
 		if (r == SLOTXY_INV_LAST && (sy & 1) == 0)
 			j += 14;
 	}
-	if (!done)
-		return;
 
+	if (!done) {
+		r = -1;
+	}
+
+	return r;
+}
+
+item_equip_type GetEquipmentTypeBySlot(int slot_index)
+{
 	item_equip_type il = ILOC_UNEQUIPABLE;
-	if (r >= SLOTXY_HEAD_FIRST && r <= SLOTXY_HEAD_LAST)
+	if (slot_index >= SLOTXY_HEAD_FIRST && slot_index <= SLOTXY_HEAD_LAST)
 		il = ILOC_HELM;
-	if (r >= SLOTXY_RING_LEFT && r <= SLOTXY_RING_RIGHT)
+	if (slot_index >= SLOTXY_RING_LEFT && slot_index <= SLOTXY_RING_RIGHT)
 		il = ILOC_RING;
-	if (r == SLOTXY_AMULET)
+	if (slot_index == SLOTXY_AMULET)
 		il = ILOC_AMULET;
-	if (r >= SLOTXY_HAND_LEFT_FIRST && r <= SLOTXY_HAND_RIGHT_LAST)
+	if (slot_index >= SLOTXY_HAND_LEFT_FIRST && slot_index <= SLOTXY_HAND_RIGHT_LAST)
 		il = ILOC_ONEHAND;
-	if (r >= SLOTXY_CHEST_FIRST && r <= SLOTXY_CHEST_LAST)
+	if (slot_index >= SLOTXY_CHEST_FIRST && slot_index <= SLOTXY_CHEST_LAST)
 		il = ILOC_ARMOR;
-	if (r >= SLOTXY_BELT_FIRST && r <= SLOTXY_BELT_LAST)
+	if (slot_index >= SLOTXY_BELT_FIRST && slot_index <= SLOTXY_BELT_LAST)
 		il = ILOC_BELT;
 
+	return il;
+}
+
+void CheckInvPaste(int pnum, Point cursorPosition)
+{
+	auto &player = plr[pnum];
+
+	SetICursor(player.HoldItem._iCurs + CURSOR_FIRSTITEM);
+	int i = cursorPosition.x + (icursW / 2);
+	int j = cursorPosition.y + (icursH / 2);
+	int sx = icursW28;
+	int sy = icursH28;
+	bool done = false;
+
+	int r = GetSlotIndexByCursorCoords(cursorPosition.x, cursorPosition.y);
+
+	if (r == -1)
+		return;
+
+	item_equip_type il = GetEquipmentTypeBySlot(r);
+
+	// Does type match?
 	done = player.HoldItem._iLoc == il;
 
+	// OVERRIDE EQUIP TYPE: Swords and Maces count as one handed for Barbarians
 	if (il == ILOC_ONEHAND && player.HoldItem._iLoc == ILOC_TWOHAND) {
 		if (player._pClass == HeroClass::Barbarian
 		    && (player.HoldItem._itype == ITYPE_SWORD || player.HoldItem._itype == ITYPE_MACE))
@@ -856,6 +882,7 @@ void CheckInvPaste(int pnum, Point cursorPosition)
 			il = ILOC_TWOHAND;
 		done = true;
 	}
+
 	if (player.HoldItem._iLoc == ILOC_UNEQUIPABLE && il == ILOC_BELT) {
 		if (sx == 1 && sy == 1) {
 			done = true;
@@ -868,7 +895,13 @@ void CheckInvPaste(int pnum, Point cursorPosition)
 		}
 	}
 
-	int it = 0;
+	int it = 0; // Used throughout rest of function
+
+	/**
+	 * NOTE:
+	 * - In one scenario, I believe this reduces the gold in the "source" slot (where gold is being taken from)
+	 * - This must also handle scrolls and other unequipables
+	*/
 	if (il == ILOC_UNEQUIPABLE) {
 		done = true;
 		int ii = r - SLOTXY_INV_FIRST;
@@ -881,7 +914,7 @@ void CheckInvPaste(int pnum, Point cursorPosition)
 					if (player.InvList[iv - 1]._itype != ITYPE_GOLD) {
 						it = iv;
 					}
-				} else {
+				} else { // Is this impossible?
 					it = -iv;
 				}
 			}
@@ -929,6 +962,9 @@ void CheckInvPaste(int pnum, Point cursorPosition)
 	if (!done)
 		return;
 
+	/**
+	 * Item can be placed in slot
+	*/
 	if (pnum == myplr)
 		PlaySFX(ItemInvSnds[ItemCAnimTbl[player.HoldItem._iCurs]]);
 
