@@ -863,7 +863,7 @@ void CheckInvPaste(int pnum, Point cursorPosition)
 	int sy = icursH28;
 	bool done = false;
 
-	int r = GetSlotIndexByCursorCoords(cursorPosition.x, cursorPosition.y);
+	int r = GetSlotIndexByCursorCoords(i, j);
 
 	if (r == -1)
 		return;
